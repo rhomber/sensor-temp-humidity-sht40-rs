@@ -101,8 +101,8 @@
 
 use embedded_hal as hal;
 
-use hal::delay::blocking::DelayUs;
-use hal::i2c::blocking::{Read, Write, WriteRead};
+use hal::i2c::I2c;
+use hal::delay::DelayNs;
 
 use sensirion_i2c::{crc8, i2c};
 
@@ -282,8 +282,8 @@ pub enum CalibrationError {
 
 impl<E, I2cWrite, I2cRead> From<i2c::Error<I2cWrite, I2cRead>> for Error<E>
 where
-    I2cWrite: Write<Error = E>,
-    I2cRead: Read<Error = E>,
+    I2cWrite: I2c<Error = E>,
+    I2cRead: I2c<Error = E>,
 {
     fn from(err: i2c::Error<I2cWrite, I2cRead>) -> Self {
         match err {
@@ -393,8 +393,8 @@ impl Command {
 
 impl<I2C, D, E> SHT40Driver<I2C, D>
 where
-    I2C: Read<Error = E> + Write<Error = E> + WriteRead<Error = E>,
-    D: DelayUs
+    I2C: I2c<Error = E>,
+    D: DelayNs
 {
     /// Initialize a new instance of the driver. Any synchronization required
     /// for dealing with multiple instances needs to be managed externally to
@@ -491,9 +491,7 @@ where
         let dev_cmd = cmd.as_device_command();
         i2c::write_command_u8(&mut self.i2c, self.address, dev_cmd.cmd_code)
             .map_err(|err| { Error::I2c(err) })?;
-        if let Err(_) = self.delay.delay_ms(dev_cmd.max_duration_ms as u32) {
-            return Err(Error::<E>::DelayError)
-        }
+        self.delay.delay_ms(dev_cmd.max_duration_ms as u32);
         if let Some(rx_bytes) = rx_bytes {
             i2c::read_words_with_crc(&mut self.i2c, self.address, rx_bytes)?;
         };
